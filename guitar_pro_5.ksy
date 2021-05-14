@@ -46,13 +46,21 @@ seq:
   - id: track_count
     type: s4
   - id: measure_headers
-    type: measure_header(_index)
+    type: measure_header(_index.as<u4>)
     repeat: expr
     repeat-expr: measure_count
   - id: tracks
-    type: track(version.minor_version.to_i, _index)
+    type: track(version.minor_version.to_i.as<u4>, _index.as<u4>)
     repeat: expr
     repeat-expr: track_count
+  - id: padding
+    type: u1
+    repeat: expr
+    repeat-expr: version.minor_version.to_i > 0 ? 1 : 2
+  - id: measures
+    type: measure
+    repeat: expr
+    repeat-expr: 1
 # instances:
 types:
   version_information:
@@ -359,12 +367,76 @@ types:
         type: s1
         repeat: expr
         repeat-expr: 3
+        if: version_minor > 0
       - id: rse_gain
         type: s1
+        if: version_minor > 0
       - id: effect_name
         type: int_byte_str
         if: version_minor > 0
       - id: effect_category
         type: int_byte_str
         if: version_minor > 0
-# enums:
+  gp4_chord:
+    seq:
+      - id: sharp
+        type: u1
+  chord:
+    seq:
+      - id: is_new_format
+        type: u1
+      - id: gp4_chord
+        type: gp4_chord
+        if: is_new_format
+  beat:
+    meta:
+      bit-endian: le
+    seq:
+      - id: dotted_notes
+        type: b1
+      - id: has_chord
+        type: b1
+      - id: has_text
+        type: b1
+      - id: has_effects
+        type: b1
+      - id: has_mix_table_change_event
+        type: b1
+      - id: has_tuplets
+        type: b1
+      - id: has_status
+        type: b1
+      - id: blank
+        type: b1
+      - id: status
+        type: u1
+        if: has_status
+      - id: duration
+        type: s1
+        doc: |
+          -2: whole note
+          -1: half note
+          0: quarter note
+          1: eighth note
+          2: sixteenth note
+          3: thirty-second note
+      - id: tuplet
+        type: s4
+        if: has_tuplets
+  voice:
+    seq:
+      - id: amount_beats
+        type: s4
+      - id: beats
+        type: beat
+        repeat: expr
+        repeat-expr: amount_beats
+  measure:
+    seq:
+      - id: voices
+        type: voice
+        repeat: expr
+        repeat-expr: 1 # actually: 2
+      - id: line_break
+        type: u1 # TODO: make enum
+        
