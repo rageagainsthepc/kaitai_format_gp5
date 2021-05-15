@@ -56,12 +56,11 @@ seq:
   - id: padding
     type: u1
     repeat: expr
-    repeat-expr: version.minor_version.to_i > 0 ? 1 : 2
+    repeat-expr: 'version.minor_version.to_i > 0 ? 1 : 2'
   - id: measures
     type: measure
     repeat: expr
     repeat-expr: 1
-# instances:
 types:
   version_information:
     seq:
@@ -248,51 +247,66 @@ types:
         type: int_byte_str
       - id: color
         type: typed_color
+  key_signature:
+    seq:
+      - id: root
+        type: s1
+      - id: type
+        type: s1
   measure_header:
     params:
       - id: measure_index
         type: u4
+    meta:
+      bit-endian: le
     seq:
       - id: skipped_byte
         type: u1
         if: measure_index > 0
-      - id: flags
-        type: u1
+      - id: has_numerator
+        type: b1
+      - id: has_denominator
+        type: b1
+      - id: begin_repeat
+        type: b1
+      - id: has_end_repeat
+        type: b1
+      - id: has_alternate_ending
+        type: b1
+      - id: has_marker
+        type: b1
+      - id: has_tonality
+        type: b1
+      - id: double_bar
+        type: b1
       - id: numerator
-        type: u1
-        if: "flags & 0x01 != 0"
+        type: s1
+        if: has_numerator
       - id: denominator
-        type: u1
-        if: "flags & 0x02 != 0"
+        type: s1
+        if: has_denominator
       - id: end_repeat
-        type: u1
-        if: "flags & 0x08 != 0"
+        type: s1
+        if: has_end_repeat
       - id: alternate_ending
         type: u1
-        if: "flags & 0x10 != 0"
+        if: has_alternate_ending
       - id: marker
         type: typed_marker
-        if: "flags & 0x20 != 0"
+        if: has_marker
       - id: tonality
-        type: u1
-        repeat: expr
-        repeat-expr: 2
-        if: "flags & 0x40 != 0"
+        type: key_signature
+        if: has_tonality
       - id: time_signature_beams
-        type: u1
+        type: s1
         repeat: expr
         repeat-expr: 4
-        if: "flags & 0x03 != 0"
+        if: has_numerator or has_denominator
       - id: unused
         type: u1
-        if: "flags & 0x10 == 0"
+        if: not has_alternate_ending
       - id: triplet_feel
         type: u1
-    instances:
-      begin_repeat:
-        value: (flags & 0x04)
-      double_bar:
-        value: (flags & 0x80)
   rse_track_instrument:
     params:
       - id: version_minor
@@ -377,17 +391,25 @@ types:
       - id: effect_category
         type: int_byte_str
         if: version_minor > 0
-  gp4_chord:
+  chord_gp4:
     seq:
       - id: sharp
         type: u1
+      - id: blank
+        type: u1
+        repeat: expr
+        repeat-expr: 3
+      - id: root
+        type: s4
   chord:
     seq:
-      - id: is_new_format
+      - id: format
         type: u1
-      - id: gp4_chord
-        type: gp4_chord
-        if: is_new_format
+      - id: body
+        type:
+          switch-on: format
+          cases:
+            _: chord_gp4
   beat:
     meta:
       bit-endian: le
@@ -413,16 +435,21 @@ types:
         if: has_status
       - id: duration
         type: s1
-        doc: |
-          -2: whole note
-          -1: half note
-          0: quarter note
-          1: eighth note
-          2: sixteenth note
-          3: thirty-second note
+        enum: duration
       - id: tuplet
         type: s4
         if: has_tuplets
+      - id: chord
+        type: chord
+        if: has_chord
+    enums:
+      duration:
+        -2: whole_note
+        -1: half_note
+        0: quarter_note
+        1: eighth_note
+        2: sixteenth_note
+        3: thirty_second_note
   voice:
     seq:
       - id: amount_beats
